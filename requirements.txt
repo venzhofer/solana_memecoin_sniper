@@ -1,2 +1,4 @@
 websockets
 python-dotenv
+requests
+httpx
