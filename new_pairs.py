@@ -7,6 +7,7 @@ from db import (
     get_recent_tokens, get_tokens_by_risk, clear_old_tokens
 )
 from price_watcher import watch_prices
+from papertrading import load_strategies, dispatch_new_token, is_blacklisted
 
 load_dotenv()
 API_KEY = os.getenv("SOLANASTREAM_API_KEY")
@@ -173,6 +174,13 @@ async def handle_connection(ws):
                     current_count = count_tokens()
                     print(f"💾 Stored in database (Total: {current_count})")
                     
+                    # Notify paper trading strategies
+                    if not is_blacklisted(mint):
+                        dispatch_new_token({
+                            "address": mint, "name": name, "symbol": symbol,
+                            "dex": dex, "risk": risk, "signature": signature
+                        })
+                    
                     # Show risk category
                     if risk <= 10:
                         risk_cat = "🟢 LOW RISK"
@@ -214,6 +222,13 @@ async def handle_connection(ws):
                             rc=rc
                         )
                         print(f"💾 Stored old format token in database")
+                        
+                        # Notify paper trading strategies
+                        if not is_blacklisted(mint):
+                            dispatch_new_token({
+                                "address": mint, "name": name, "symbol": symbol,
+                                "dex": dex, "risk": risk, "signature": sig
+                            })
                 except Exception as e:
                     print(f"❌ Database error for old format: {e}")
             elif msg.get("result") and msg.get("result", {}).get("message"):
@@ -289,6 +304,9 @@ async def main():
     print("🔍 Monitoring for new safe memecoins...")
     print("-" * 60)
     
+    # Load paper trading strategies
+    load_strategies()
+    
     # Start periodic maintenance and price watching tasks
     maintenance_task = asyncio.create_task(periodic_maintenance())
     prices_task = asyncio.create_task(watch_prices())
@@ -307,6 +325,10 @@ async def main():
                 await t
             except asyncio.CancelledError:
                 pass
+        
+        # Shutdown paper trading strategies
+        from papertrading import shutdown
+        shutdown()
 
 if __name__ == "__main__":
     try:
@@ -329,6 +351,10 @@ if __name__ == "__main__":
             
         except Exception as e:
             print(f"❌ Error getting final stats: {e}")
+        
+        # Shutdown paper trading strategies
+        from papertrading import shutdown
+        shutdown()
         
         print("=" * 60)
         print("👋 Goodbye!")

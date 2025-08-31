@@ -1,10 +1,11 @@
 import os, math, asyncio, itertools
 import time
 import httpx
-from db import list_all_addresses, upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
+from db import upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
 from dexscreener_client import fetch_token_batch
 from ohlc_agg import add_sample
 from indicators import update_all_for_bar
+from papertrading import get_watchable_addresses, dispatch_bar_1m
 
 INTERVAL = float(os.getenv("PRICE_POLL_INTERVAL_SEC", "2"))
 BATCH_SIZE = int(os.getenv("DEXSCREENER_BATCH_SIZE", "30"))
@@ -51,6 +52,7 @@ async def _poll_once(client: httpx.AsyncClient, addr_batches):
                     })
                     insert_ema_1m(ema_rows)
                     insert_atr_1m(atr_rows)
+                    dispatch_bar_1m(bar, ema_rows, atr_rows)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 await asyncio.sleep(1.5)  # brief backoff
@@ -65,7 +67,7 @@ async def watch_prices(refresh_addrs_every: float = 10.0):
     limits = httpx.Limits(max_connections=limit_per_tick * 2, max_keepalive_connections=limit_per_tick * 2)
 
     async with httpx.AsyncClient(timeout=timeout, limits=limits, http2=True) as client:
-        addrs = list_all_addresses()
+        addrs = get_watchable_addresses()
         last_refresh = 0.0
         all_batches = list(_chunk(addrs, BATCH_SIZE))
         idx = 0
@@ -74,7 +76,7 @@ async def watch_prices(refresh_addrs_every: float = 10.0):
         while True:
             now = loop.time()
             if (now - last_refresh) >= refresh_addrs_every:
-                addrs = list_all_addresses()
+                addrs = get_watchable_addresses()
                 all_batches = list(_chunk(addrs, BATCH_SIZE))
                 idx = 0 if idx >= len(all_batches) else idx
                 last_refresh = now
