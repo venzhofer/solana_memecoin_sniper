@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 def _parse_lengths(val: str, default: str) -> list[int]:
     raw = (val or default).replace(";", ",")

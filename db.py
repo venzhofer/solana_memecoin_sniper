@@ -1,13 +1,15 @@
 import os, sqlite3, json
 
-# single shared in-RAM database
-_MEM_URI = "file:memdb1?mode=memory&cache=shared"
-DB = sqlite3.connect(_MEM_URI, uri=True, check_same_thread=False)
+# persistent file-based database (instead of in-memory)
+DB_PATH = "memecoin_sniper.db"
+DB = sqlite3.connect(DB_PATH, check_same_thread=False)
 
-# fast pragmas for memory use
-DB.execute("PRAGMA journal_mode=MEMORY")
-DB.execute("PRAGMA synchronous=OFF")
+# fast pragmas for performance
+DB.execute("PRAGMA journal_mode=WAL")
+DB.execute("PRAGMA synchronous=NORMAL")
 DB.execute("PRAGMA temp_store=MEMORY")
+DB.execute("PRAGMA cache_size=10000")
+DB.execute("PRAGMA mmap_size=268435456")
 
 DB.execute("""
 CREATE TABLE IF NOT EXISTS tokens (

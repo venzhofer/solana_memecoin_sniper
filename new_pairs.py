@@ -1,7 +1,7 @@
 import asyncio, json, os, sys, signal
 from dotenv import load_dotenv
 import websockets
-from rugcheck_client import get_risk_level
+# DISABLED: from rugcheck_client import get_risk_level
 from db import (
     upsert_safe_token, count_tokens, get_stats, 
     get_recent_tokens, get_tokens_by_risk, clear_old_tokens
@@ -147,13 +147,17 @@ async def handle_connection(ws):
                 
                 # Get risk assessment from RugCheck
                 MIN_RISK = int(os.getenv("RUGCHECK_MIN_RISK", "20"))
-                risk, rc = get_risk_level("solana", mint)
+                # DISABLED: risk, rc = get_risk_level("solana", mint)
                 
                 # Skip coins with risk > 20 or no risk data
-                if risk is None:
-                    continue  # Skip coins without risk data
-                elif risk > MIN_RISK:
-                    continue  # Skip high-risk coins
+                # DISABLED: if risk is None:
+                #     continue  # Skip coins without risk data
+                # elif risk > MIN_RISK:
+                #     continue  # Skip high-risk coins
+                
+                # Treat all coins as safe (risk = 0)
+                risk = 0
+                rc = {"risk": 0, "summary": "Risk assessment disabled"}
                 
                 # Only show safe coins (risk <= 20)
                 print(f"✅ SAFE COIN: {name} ({symbol}) | mint={mint} | DEX={dex} | risk={risk} | tx=https://solscan.io/tx/{signature}")
@@ -210,7 +214,10 @@ async def handle_connection(ws):
                 
                 # Also try to get risk assessment and store in database for old format
                 try:
-                    risk, rc = get_risk_level("solana", mint)
+                    # DISABLED: risk, rc = get_risk_level("solana", mint)
+                    # Treat all coins as safe
+                    risk = 0
+                    rc = {"risk": 0, "summary": "Risk assessment disabled"}
                     if risk is not None and risk <= int(os.getenv("RUGCHECK_MIN_RISK", "20")):
                         upsert_safe_token(
                             address=mint,

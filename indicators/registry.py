@@ -48,6 +48,7 @@ def update_all_for_bar(bar: dict) -> tuple[list, list]:
             "address": address,
             "ts_start": bar["ts_start"],
             "length": length,
+            "source": ema.source,
             "value": value
         })
     

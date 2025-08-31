@@ -52,7 +52,18 @@ async def _poll_once(client: httpx.AsyncClient, addr_batches):
                     })
                     insert_ema_1m(ema_rows)
                     insert_atr_1m(atr_rows)
-                    dispatch_bar_1m(bar, ema_rows, atr_rows)
+
+                    # >>> add market cap so strategies can log PnL with MC
+                    bar_for_strat = {
+                        "address": bar["address"],
+                        "ts_start": bar["ts_start"],
+                        "open":  bar["open"],
+                        "high":  bar["high"],
+                        "low":   bar["low"],
+                        "close": bar["close"],
+                        "marketcap_usd": bar.get("marketcap_usd"),   # <- NEW
+                    }
+                    dispatch_bar_1m(bar_for_strat, ema_rows, atr_rows)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 await asyncio.sleep(1.5)  # brief backoff
