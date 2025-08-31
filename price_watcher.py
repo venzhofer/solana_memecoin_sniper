@@ -1,9 +1,10 @@
 import os, math, asyncio, itertools
 import time
 import httpx
-from db import list_all_addresses, upsert_price, insert_ohlc_1m
+from db import list_all_addresses, upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
 from dexscreener_client import fetch_token_batch
 from ohlc_agg import add_sample
+from indicators import update_all_for_bar
 
 INTERVAL = float(os.getenv("PRICE_POLL_INTERVAL_SEC", "2"))
 BATCH_SIZE = int(os.getenv("DEXSCREENER_BATCH_SIZE", "30"))
@@ -40,6 +41,16 @@ async def _poll_once(client: httpx.AsyncClient, addr_batches):
                 )
                 if bar:
                     insert_ohlc_1m(bar)
+                    ema_rows, atr_rows = update_all_for_bar({
+                        "address": bar["address"],
+                        "ts_start": bar["ts_start"],
+                        "open":  bar["open"],
+                        "high":  bar["high"],
+                        "low":   bar["low"],
+                        "close": bar["close"],
+                    })
+                    insert_ema_1m(ema_rows)
+                    insert_atr_1m(atr_rows)
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 await asyncio.sleep(1.5)  # brief backoff

@@ -190,3 +190,71 @@ def get_ohlc_1m(address: str, limit: int = 120) -> list[tuple]:
       ORDER BY ts_start DESC
       LIMIT ?
     """, (address, int(limit))).fetchall()
+
+# --- EMA storage ---
+DB.execute("""
+CREATE TABLE IF NOT EXISTS ema_1m (
+  address        TEXT NOT NULL,
+  ts_start       INTEGER NOT NULL,               -- epoch seconds (UTC) for minute start
+  length         INTEGER NOT NULL,               -- EMA period length
+  value          REAL NOT NULL,                  -- EMA value
+  PRIMARY KEY(address, ts_start, length)
+);
+""")
+DB.execute("CREATE INDEX IF NOT EXISTS idx_ema_1m_addr_time ON ema_1m(address, ts_start)")
+DB.commit()
+
+def insert_ema_1m(ema_rows: list) -> None:
+    """Insert EMA values for a token."""
+    for row in ema_rows:
+        DB.execute("""
+          INSERT OR REPLACE INTO ema_1m
+            (address, ts_start, length, value)
+          VALUES
+            (:address, :ts_start, :length, :value)
+        """, row)
+    DB.commit()
+
+def get_ema_1m(address: str, length: int, limit: int = 120) -> list[tuple]:
+    """Get recent EMA values for a token."""
+    return DB.execute("""
+      SELECT ts_start, value
+      FROM ema_1m
+      WHERE address = ? AND length = ?
+      ORDER BY ts_start DESC
+      LIMIT ?
+    """, (address, length, int(limit))).fetchall()
+
+# --- ATR storage ---
+DB.execute("""
+CREATE TABLE IF NOT EXISTS atr_1m (
+  address        TEXT NOT NULL,
+  ts_start       INTEGER NOT NULL,               -- epoch seconds (UTC) for minute start
+  length         INTEGER NOT NULL,               -- ATR period length
+  value          REAL NOT NULL,                  -- ATR value
+  PRIMARY KEY(address, ts_start, length)
+);
+""")
+DB.execute("CREATE INDEX IF NOT EXISTS idx_atr_1m_addr_time ON atr_1m(address, ts_start)")
+DB.commit()
+
+def insert_atr_1m(atr_rows: list) -> None:
+    """Insert ATR values for a token."""
+    for row in atr_rows:
+        DB.execute("""
+          INSERT OR REPLACE INTO atr_1m
+            (address, ts_start, length, value)
+          VALUES
+            (:address, :ts_start, :length, :value)
+        """, row)
+    DB.commit()
+
+def get_atr_1m(address: str, length: int, limit: int = 120) -> list[tuple]:
+    """Get recent ATR values for a token."""
+    return DB.execute("""
+      SELECT ts_start, value
+      FROM atr_1m
+      WHERE address = ? AND length = ?
+      ORDER BY ts_start DESC
+      LIMIT ?
+    """, (address, length, int(limit))).fetchall()

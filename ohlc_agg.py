@@ -27,6 +27,12 @@ def add_sample(address: str, *, price: float = None, fdv: float = None, mc: floa
         buf.first_ts = ts
 
     buf.samples.append((ts, price, fdv, mc))
+    
+    # DEBUG: Show progress towards OHLC bar
+    current_samples = len(buf.samples)
+    if current_samples % 5 == 0:  # Show progress every 5 samples
+        remaining = SAMPLES_PER_BAR - current_samples
+        print(f"📊 OHLC Progress for {address}: {current_samples}/{SAMPLES_PER_BAR} samples ({remaining} remaining)")
 
     if len(buf.samples) < SAMPLES_PER_BAR:
         return None
@@ -52,6 +58,16 @@ def add_sample(address: str, *, price: float = None, fdv: float = None, mc: floa
     # Floor to the minute of the first sample in the window
     first_ts = items[0][0]
     ts_start = int(first_ts // 60 * 60)
+
+    # DEBUG: Show detailed OHLC bar creation
+    print(f"🎯 OHLC BAR CREATED for {address}:")
+    print(f"   📅 Time: {time.strftime('%H:%M:%S', time.gmtime(ts_start))}")
+    print(f"   💰 O:{open_:.6f} H:{high_:.6f} L:{low_:.6f} C:{close_:.6f}")
+    print(f"   📈 Price Range: {((high_ - low_) / low_ * 100):.2f}%")
+    print(f"   💎 FDV: ${fdv_last:,.0f}" if fdv_last else "   💎 FDV: N/A")
+    print(f"   🏦 MC: ${mc_last:,.0f}" if mc_last else "   🏦 MC: N/A")
+    print(f"   📊 Samples: {len(items)}")
+    print("-" * 50)
 
     return {
         "address": address,
