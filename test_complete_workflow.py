@@ -1,168 +1,247 @@
 #!/usr/bin/env python3
 """
-Complete Paper Trading Workflow Test
-Tests the entire system from token discovery to trade execution
+COMPLETE MEMECOIN SNIPER WORKFLOW TEST
+=======================================
+This test simulates the entire system:
+1. New memecoin appears
+2. Database storage
+3. Price monitoring
+4. OHLC creation
+5. Technical indicators
+6. Strategy evaluation
+7. Paper trading execution
 """
 
+import os
 import time
-import random
+import asyncio
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Import our modules
+from db import upsert_safe_token, count_tokens, get_tokens_by_risk
+from indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
 from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, reset_indicators
-from db import (
-    upsert_safe_token, insert_ohlc_1m, insert_ema_1m, insert_atr_1m,
-    count_tokens, get_stats
-)
+from papertrading.db import get_watchable_addresses, pos_get, trade_log
 
-def test_complete_workflow():
-    """Test the complete paper trading workflow."""
-    print("🚀 COMPLETE PAPER TRADING WORKFLOW TEST")
-    print("=" * 70)
+def simulate_new_memecoin():
+    """Simulate a new memecoin appearing"""
+    print("🎯 STEP 1: SIMULATING NEW MEMECOIN")
+    print("=" * 50)
     
-    # Step 1: Load strategies
-    print("\n1️⃣ Loading paper trading strategies...")
-    strategies = load_strategies()
-    print(f"   ✅ Loaded {len(strategies)} strategies")
+    # Simulate memecoin data
+    memecoin = {
+        "address": "TEST123456789abcdefghijklmnopqrstuvwxyz",
+        "name": "TestMoonCoin",
+        "symbol": "TMC",
+        "dex": "pumpswap",
+        "risk": 0,
+        "signature": "test_signature_123",
+        "rc": {"risk": 0, "summary": "Test coin"}
+    }
     
-    # Step 2: Simulate token discovery
-    print("\n2️⃣ Simulating token discovery...")
-    test_tokens = [
-        {
-            "address": "token_001",
-            "name": "Test Token Alpha",
-            "symbol": "ALPHA",
-            "dex": "Raydium",
-            "risk": 12,
-            "signature": "sig_001",
-            "rc": {"score": 12, "details": "test"}
-        },
-        {
-            "address": "token_002", 
-            "name": "Test Token Beta",
-            "symbol": "BETA",
-            "dex": "Raydium",
-            "risk": 8,
-            "signature": "sig_002",
-            "rc": {"score": 8, "details": "test"}
-        }
-    ]
+    print(f"🆕 New memecoin detected:")
+    print(f"   Name: {memecoin['name']} ({memecoin['symbol']})")
+    print(f"   Address: {memecoin['address']}")
+    print(f"   DEX: {memecoin['dex']}")
+    print(f"   Risk: {memecoin['risk']}")
     
-    for token in test_tokens:
-        print(f"   🆕 Discovering: {token['name']} ({token['symbol']}) - Risk: {token['risk']}")
-        upsert_safe_token(**token)
-        dispatch_new_token(token)
-        print(f"   ✅ Token stored and strategies notified")
+    # Store in database
+    upsert_safe_token(**memecoin)
+    print(f"💾 Stored in database")
     
-    # Step 3: Check database status
-    print("\n3️⃣ Checking database status...")
-    stats = get_stats()
-    print(f"   📊 Total tokens: {stats['total']}")
-    print(f"   📊 Low risk (0-10): {stats['low_risk_0_10']}")
-    print(f"   📊 Medium risk (11-20): {stats['medium_risk_11_20']}")
+    # Check database
+    total = count_tokens()
+    print(f"📊 Database now has {total} tokens")
     
-    # Step 4: Simulate price data and OHLC creation
-    print("\n4️⃣ Simulating price data and OHLC creation...")
+    return memecoin
+
+def simulate_price_data(address, base_price=0.001):
+    """Simulate price data for the memecoin"""
+    print(f"\n💰 STEP 2: SIMULATING PRICE DATA")
+    print("=" * 50)
     
-    for token in test_tokens:
-        addr = token["address"]
-        print(f"\n   📈 Processing {token['name']} ({token['symbol']})...")
-        
-        # Generate realistic price movement
-        base_price = 1.0
-        timestamp = int(time.time())
-        
-        for i in range(5):  # 5 OHLC bars
-            # Price movement
-            change = random.uniform(-0.03, 0.05)  # -3% to +5%
-            base_price *= (1 + change)
-            
-            # Create OHLC bar
-            high = base_price * random.uniform(1.0, 1.08)
-            low = base_price * random.uniform(0.92, 1.0)
-            open_price = base_price
-            close_price = base_price * (1 + random.uniform(-0.02, 0.03))
-            
-            bar = {
-                "address": addr,
-                "ts_start": timestamp + (i * 60),
-                "open": open_price,
-                "high": high,
-                "low": low,
-                "close": close_price,
-                "fdv_usd": 1000000 * (1 + i * 0.1),
-                "marketcap_usd": 500000 * (1 + i * 0.1),
-                "samples": 30
-            }
-            
-            print(f"      Bar {i+1}: O:{open_price:.4f} H:{high:.4f} L:{low:.4f} C:{close_price:.4f}")
-            
-            # Store OHLC
-            insert_ohlc_1m(bar)
-            
-            # Calculate indicators
-            ema_rows, atr_rows = update_all_for_bar(bar)
-            insert_ema_1m(ema_rows)
-            insert_atr_1m(atr_rows)
-            
-            # Notify strategies with market cap
-            bar_for_strat = {
-                "address": bar["address"],
-                "ts_start": bar["ts_start"],
-                "open": bar["open"],
-                "high": bar["high"],
-                "low": bar["low"],
-                "close": bar["close"],
-                "marketcap_usd": bar.get("marketcap_usd"),
-            }
-            dispatch_bar_1m(bar_for_strat, ema_rows, atr_rows)
-            
-            print(f"      📊 Indicators: {len(ema_rows)} EMAs, {len(atr_rows)} ATRs")
-            
-            # Show current values
-            for ema_row in ema_rows:
-                print(f"         EMA({ema_row['length']}): {ema_row['value']:.6f}")
-            for atr_row in atr_rows:
-                print(f"         ATR({atr_row['length']}): {atr_row['value']:.6f}")
-            
-            time.sleep(0.1)  # Small delay for readability
+    # Simulate price movement (breakout pattern)
+    prices = []
+    base_time = int(time.time())
     
-    # Step 5: Check paper trading positions
-    print("\n5️⃣ Checking paper trading positions...")
-    from papertrading.db import get_watchable_addresses, pos_get
-    
-    watchable = get_watchable_addresses()
-    print(f"   📊 Watchable addresses: {len(watchable)}")
-    
-    for addr in watchable:
-        pos = pos_get(addr)
-        if pos:
-            print(f"   📈 Position for {addr}: {pos}")
+    # Create 10 price samples (enough for OHLC + indicators)
+    for i in range(10):
+        # Simulate price increase with some volatility
+        if i < 3:
+            # First 3 bars: sideways
+            price = base_price * (1 + (i * 0.1))
+        elif i < 6:
+            # Next 3 bars: breakout
+            price = base_price * (1.5 + (i * 0.3))
         else:
-            print(f"   ⚪ No position for {addr}")
+            # Last 4 bars: momentum
+            price = base_price * (2.5 + (i * 0.2))
+        
+        # Add some volatility
+        price *= (1 + (i * 0.05))
+        
+        # Create OHLC bar
+        high = price * 1.1
+        low = price * 0.9
+        open_price = price * 0.95
+        close_price = price
+        
+        bar = {
+            "address": address,
+            "ts_start": base_time + (i * 60),  # 1-minute intervals
+            "open": open_price,
+            "high": high,
+            "low": low,
+            "close": close_price,
+            "volume": 1000000 + (i * 100000),
+            "fdv_usd": 1000000 + (i * 100000),
+            "marketcap_usd": 500000 + (i * 50000),
+            "samples": 30
+        }
+        
+        prices.append(bar)
+        print(f"   Bar {i+1}: O:{open_price:.6f} H:{high:.6f} L:{low:.6f} C:{close_price:.6f}")
     
-    # Step 6: Final status
-    print("\n6️⃣ Final system status...")
-    final_stats = get_stats()
-    print(f"   📊 Final tokens: {final_stats['total']}")
-    print(f"   📊 Low risk: {final_stats['low_risk_0_10']}")
-    print(f"   📊 Medium risk: {final_stats['medium_risk_11_20']}")
-    
-    print(f"\n✅ Complete workflow test finished!")
-    
-    # Shutdown strategies
-    print(f"\n🔄 Shutting down strategies...")
-    shutdown()
-    print(f"   ✅ Strategies shut down")
+    return prices
 
-if __name__ == "__main__":
+def test_ohlc_and_indicators(address, prices):
+    """Test OHLC creation and technical indicators"""
+    print(f"\n📊 STEP 3: TESTING OHLC & INDICATORS")
+    print("=" * 50)
+    
+    print(f"📈 Processing {len(prices)} price bars...")
+    
+    # Process each bar through indicators
+    for i, bar in enumerate(prices):
+        print(f"\n   Processing bar {i+1}:")
+        print(f"     Time: {datetime.fromtimestamp(bar['ts_start']).strftime('%H:%M:%S')}")
+        print(f"     Price: ${bar['close']:.6f}")
+        
+        # Update indicators
+        ema_rows, atr_rows = update_all_for_bar(bar)
+        
+        # Show indicator values
+        if ema_rows:
+            for ema in ema_rows:
+                print(f"     EMA({ema['length']}) {ema['source']}: {ema['value']:.6f}")
+        
+        if atr_rows:
+            for atr in atr_rows:
+                print(f"     ATR({atr['length']}): {atr['value']:.6f}")
+    
+    return prices
+
+def test_strategy_execution(address, prices):
+    """Test strategy evaluation and paper trading"""
+    print(f"\n🎯 STEP 4: TESTING STRATEGY EXECUTION")
+    print("=" * 50)
+    
+    # Load strategies
+    strategies = load_strategies()
+    print(f"📋 Loaded {len(strategies)} strategies")
+    
+    # Process bars through strategy
+    for i, bar in enumerate(prices):
+        print(f"\n   Strategy evaluating bar {i+1}:")
+        
+        # Get indicators for this bar
+        ema_rows, atr_rows = update_all_for_bar(bar)
+        
+        # Dispatch to strategy
+        dispatch_bar_1m(bar, ema_rows, atr_rows)
+        
+        # Check if position was opened
+        position = pos_get(address)
+        if position and position[1] == "long":
+            print(f"     🚀 POSITION OPENED!")
+            print(f"        Entry: ${position[3]:.6f}")
+            print(f"        Stop: ${position[4]:.6f}")
+            break
+        elif position:
+            print(f"     📊 Position status: {position[1]}")
+        else:
+            print(f"     ⏳ No position yet")
+    
+    # Check final position
+    final_position = pos_get(address)
+    if final_position:
+        print(f"\n📊 FINAL POSITION STATUS:")
+        print(f"   Status: {final_position[1]}")
+        print(f"   Entry Price: ${final_position[3]:.6f}")
+        print(f"   Stop Price: ${final_position[4]:.6f}")
+        print(f"   High Since Entry: ${final_position[6]:.6f}")
+    else:
+        print(f"\n❌ No position opened")
+
+def test_database_persistence():
+    """Test that data persists in the database"""
+    print(f"\n💾 STEP 5: TESTING DATABASE PERSISTENCE")
+    print("=" * 50)
+    
+    # Check tokens
+    total = count_tokens()
+    print(f"📊 Total tokens in database: {total}")
+    
+    if total > 0:
+        tokens = get_tokens_by_risk(20, 10)
+        print(f"🔍 Recent tokens:")
+        for token in tokens:
+            print(f"   {token[1]} ({token[2]}) - {token[4]} risk")
+    
+    # Check watchable addresses
+    watchable = get_watchable_addresses(10)
+    print(f"👀 Watchable addresses: {len(watchable)}")
+    
+    # Check positions
+    from papertrading.db import DB
+    positions = DB.execute("SELECT COUNT(*) FROM paper_positions").fetchone()[0]
+    print(f"📈 Paper positions: {positions}")
+    
+    trades = DB.execute("SELECT COUNT(*) FROM paper_trades").fetchone()[0]
+    print(f"💰 Paper trades: {trades}")
+
+def main():
+    """Run the complete workflow test"""
+    print("🚀 COMPLETE MEMECOIN SNIPER WORKFLOW TEST")
+    print("=" * 60)
+    print(f"⏰ Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"📊 EMA Lengths: {EMA_LENGTHS}")
+    print(f"📊 EMA Source: {EMA_SOURCE}")
+    print(f"📊 ATR Lengths: {ATR_LENGTHS}")
+    print("=" * 60)
+    
     try:
-        test_complete_workflow()
+        # Step 1: Simulate new memecoin
+        memecoin = simulate_new_memecoin()
+        
+        # Step 2: Simulate price data
+        prices = simulate_price_data(memecoin['address'])
+        
+        # Step 3: Test OHLC and indicators
+        test_ohlc_and_indicators(memecoin['address'], prices)
+        
+        # Step 4: Test strategy execution
+        test_strategy_execution(memecoin['address'], prices)
+        
+        # Step 5: Test database persistence
+        test_database_persistence()
+        
+        print(f"\n🎉 COMPLETE WORKFLOW TEST FINISHED!")
+        print("=" * 60)
+        
     except Exception as e:
-        print(f"\n❌ Error during test: {e}")
+        print(f"\n❌ TEST FAILED: {e}")
         import traceback
         traceback.print_exc()
+    
+    finally:
+        # Cleanup
         shutdown()
+        print(f"\n🧹 Cleanup completed")
+
+if __name__ == "__main__":
+    main()
