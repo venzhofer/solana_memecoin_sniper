@@ -260,12 +260,12 @@ async def handle_connection(ws):
             pass
 
 async def listen():
-    # Use minimal connection options to avoid ping/pong issues
+    # Allow the client to participate in server heartbeats
     connect_kwargs = {
-        "ping_interval": None,  # Disable automatic ping/pong
-        "ping_timeout": None,   # Disable ping timeout
-        "close_timeout": 10,    # Wait 10 seconds for close
-        "max_size": None        # No message size limit
+        "ping_interval": 20,  # default ping interval
+        "ping_timeout": 20,   # default ping timeout
+        "close_timeout": 10,  # Wait 10 seconds for close
+        "max_size": None      # No message size limit
     }
 
     print(f"[debug] Connecting to {URL} with API key: {API_KEY[:10]}...")
