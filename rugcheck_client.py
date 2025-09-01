@@ -25,7 +25,7 @@ def _req(url: str, params: typing.Optional[dict] = None) -> typing.Optional[dict
         print(f"[rugcheck] Request exception: {e}")
         return None
 
-def get_risk_level(chain: str, contract: str, retries: int = 2, sleep_s: float = 0.6) -> typing.Tuple[typing.Optional[int], typing.Optional[dict]]:
+def get_risk_level(contract: str, retries: int = 2, sleep_s: float = 0.6) -> typing.Tuple[typing.Optional[int], typing.Optional[dict]]:
     """
     Returns (riskLevel, full_json) for the token. None if unavailable.
     """

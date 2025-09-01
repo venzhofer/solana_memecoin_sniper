@@ -4,6 +4,7 @@ import time
 from collections import defaultdict, deque
 
 SAMPLES_PER_BAR = 30  # 30 samples × 2s interval ≈ 60s
+INACTIVITY_SEC = 300  # cleanup buffers for tokens inactive >5m
 
 class _Buf:
     __slots__ = ("samples", "first_ts")
@@ -12,6 +13,12 @@ class _Buf:
         self.first_ts = None
 
 _buffers: dict[str, _Buf] = defaultdict(_Buf)
+
+
+def _cleanup(now: float) -> None:
+    stale = [addr for addr, buf in _buffers.items() if buf.samples and (now - buf.samples[-1][0] > INACTIVITY_SEC)]
+    for addr in stale:
+        del _buffers[addr]
 
 def add_sample(address: str, *, price: float = None, fdv: float = None, mc: float = None, ts: float = None):
     """
@@ -22,6 +29,7 @@ def add_sample(address: str, *, price: float = None, fdv: float = None, mc: floa
         return None  # don't count missing price
 
     ts = ts or time.time()
+    _cleanup(ts)
     buf = _buffers[address]
     if buf.first_ts is None:
         buf.first_ts = ts

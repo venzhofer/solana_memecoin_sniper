@@ -1,9 +1,9 @@
 import asyncio, json, os, sys, signal
 from dotenv import load_dotenv
 import websockets
-# DISABLED: from rugcheck_client import get_risk_level
+from rugcheck_client import get_risk_level
 from db import (
-    upsert_safe_token, count_tokens, get_stats, 
+    upsert_safe_token, count_tokens, get_stats,
     get_recent_tokens, get_tokens_by_risk, clear_old_tokens
 )
 from price_watcher import watch_prices
@@ -14,6 +14,8 @@ API_KEY = os.getenv("SOLANASTREAM_API_KEY")
 if not API_KEY:
     print("Missing SOLANASTREAM_API_KEY in .env")
     sys.exit(1)
+
+SKIP_RISK_CHECK = os.getenv("SKIP_RISK_CHECK", "0") == "1"
 
 # Signal handler for database queries
 def signal_handler(signum, frame):
@@ -113,112 +115,110 @@ async def handle_connection(ws):
         message_count = 0
         async for raw in ws:
             message_count += 1
-            
+
             try:
                 msg = json.loads(raw)
-                
-                # Add heartbeat to show we're receiving data
+
                 if msg.get("method") == "ping":
                     await ws.send(json.dumps({"jsonrpc": "2.0", "id": msg.get("id"), "result": "pong"}))
                     continue
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"[ws] JSON decode error: {e} -> {raw[:200]!r}")
                 continue
             except Exception as e:
+                print(f"[ws] error parsing message: {e} -> {raw[:200]!r}")
                 continue
 
-            # Process new pair messages
-            if msg.get("method") == "newPairNotification" and msg.get("params"):
-                params = msg["params"]
-                signature = params.get("signature", "")
-                
-                # Extract token info from the notification
-                pair = params.get("pair", {})
-                dex = pair.get("sourceExchange", "unknown")
-                
-                # Skip PumpFun tokens
-                if dex.lower() == "pumpfun":
-                    continue
-                
-                base = pair.get("baseToken", {})
-                meta = (base.get("info") or {}).get("metadata") or {}
-                name = meta.get("name", "Unknown")
-                symbol = meta.get("symbol", "")
-                mint = base.get("account", "")
-                
-                # Get risk assessment from RugCheck
-                MIN_RISK = int(os.getenv("RUGCHECK_MIN_RISK", "20"))
-                # DISABLED: risk, rc = get_risk_level("solana", mint)
-                
-                # Skip coins with risk > 20 or no risk data
-                # DISABLED: if risk is None:
-                #     continue  # Skip coins without risk data
-                # elif risk > MIN_RISK:
-                #     continue  # Skip high-risk coins
-                
-                # Treat all coins as safe (risk = 0)
-                risk = 0
-                rc = {"risk": 0, "summary": "Risk assessment disabled"}
-                
-                # Only show safe coins (risk <= 20)
-                print(f"✅ SAFE COIN: {name} ({symbol}) | mint={mint} | DEX={dex} | risk={risk} | tx=https://solscan.io/tx/{signature}")
-                
-                # Store in database
-                try:
-                    upsert_safe_token(
-                        address=mint,
-                        name=name,
-                        symbol=symbol,
-                        dex=dex,
-                        risk=risk,
-                        signature=signature,
-                        rc=rc
-                    )
-                    
-                    # Show updated stats
-                    current_count = count_tokens()
-                    print(f"💾 Stored in database (Total: {current_count})")
-                    
-                    # Notify paper trading strategies
-                    if not is_blacklisted(mint):
-                        dispatch_new_token({
-                            "address": mint, "name": name, "symbol": symbol,
-                            "dex": dex, "risk": risk, "signature": signature
-                        })
-                    
-                    # Show risk category
-                    if risk <= 10:
-                        risk_cat = "🟢 LOW RISK"
-                    elif risk <= 15:
-                        risk_cat = "🟡 MEDIUM-LOW"
-                    else:
-                        risk_cat = "🟠 MEDIUM"
-                    
-                    print(f"   {risk_cat} | {name} ({symbol}) | DEX: {dex}")
-                    
-                except Exception as e:
-                    print(f"❌ Database error: {e}")
-                
-            elif msg.get("pair") and msg.get("signature"):
-                # Keep the old format handling as fallback
-                pair = msg["pair"]
-                dex = pair.get("sourceExchange", "unknown")
-                
-                base = pair.get("baseToken", {})
-                meta = (base.get("info") or {}).get("metadata") or {}
-                name = meta.get("name", "Unknown")
-                symbol = meta.get("symbol", "")
-                mint = pair.get("account", "")
-                sig = msg.get("signature")
+            try:
+                if msg.get("method") == "newPairNotification" and msg.get("params"):
+                    params = msg["params"]
+                    signature = params.get("signature", "")
 
-                print(f"🆕 NEW COIN: {name} ({symbol}) | mint={mint} | DEX={dex} | tx=https://solscan.io/tx/{sig}")
-                
-                # Also try to get risk assessment and store in database for old format
-                try:
-                    # DISABLED: risk, rc = get_risk_level("solana", mint)
-                    # Treat all coins as safe
-                    risk = 0
-                    rc = {"risk": 0, "summary": "Risk assessment disabled"}
-                    if risk is not None and risk <= int(os.getenv("RUGCHECK_MIN_RISK", "20")):
+                    pair = params.get("pair", {})
+                    dex = pair.get("sourceExchange", "unknown")
+                    if dex.lower() == "pumpfun":
+                        continue
+
+                    base = pair.get("baseToken", {})
+                    meta = (base.get("info") or {}).get("metadata") or {}
+                    name = meta.get("name", "Unknown")
+                    symbol = meta.get("symbol", "")
+                    mint = base.get("account", "")
+
+                    MIN_RISK = int(os.getenv("RUGCHECK_MIN_RISK", "20"))
+                    if SKIP_RISK_CHECK:
+                        risk = 0
+                        rc = {"risk": 0, "summary": "Risk check skipped"}
+                    else:
+                        risk, rc = get_risk_level(mint)
+                        if risk is None or risk > MIN_RISK:
+                            continue
+
+                    print(
+                        f"✅ SAFE COIN: {name} ({symbol}) | mint={mint} | DEX={dex} | risk={risk} | tx=https://solscan.io/tx/{signature}"
+                    )
+
+                    try:
+                        upsert_safe_token(
+                            address=mint,
+                            name=name,
+                            symbol=symbol,
+                            dex=dex,
+                            risk=risk,
+                            signature=signature,
+                            rc=rc,
+                        )
+
+                        current_count = count_tokens()
+                        print(f"💾 Stored in database (Total: {current_count})")
+
+                        if not is_blacklisted(mint):
+                            dispatch_new_token(
+                                {
+                                    "address": mint,
+                                    "name": name,
+                                    "symbol": symbol,
+                                    "dex": dex,
+                                    "risk": risk,
+                                    "signature": signature,
+                                }
+                            )
+
+                        if risk <= 10:
+                            risk_cat = "🟢 LOW RISK"
+                        elif risk <= 15:
+                            risk_cat = "🟡 MEDIUM-LOW"
+                        else:
+                            risk_cat = "🟠 MEDIUM"
+
+                        print(f"   {risk_cat} | {name} ({symbol}) | DEX: {dex}")
+                    except Exception as e:
+                        print(f"❌ Database error: {e}")
+
+                elif msg.get("pair") and msg.get("signature"):
+                    pair = msg["pair"]
+                    dex = pair.get("sourceExchange", "unknown")
+
+                    base = pair.get("baseToken", {})
+                    meta = (base.get("info") or {}).get("metadata") or {}
+                    name = meta.get("name", "Unknown")
+                    symbol = meta.get("symbol", "")
+                    mint = pair.get("account", "")
+                    sig = msg.get("signature")
+
+                    print(
+                        f"🆕 NEW COIN: {name} ({symbol}) | mint={mint} | DEX={dex} | tx=https://solscan.io/tx/{sig}"
+                    )
+
+                    try:
+                        if SKIP_RISK_CHECK:
+                            risk = 0
+                            rc = {"risk": 0, "summary": "Risk check skipped"}
+                        else:
+                            risk, rc = get_risk_level(mint)
+                            if risk is None or risk > int(os.getenv("RUGCHECK_MIN_RISK", "20")):
+                                continue
+
                         upsert_safe_token(
                             address=mint,
                             name=name,
@@ -226,21 +226,31 @@ async def handle_connection(ws):
                             dex=dex,
                             risk=risk,
                             signature=sig,
-                            rc=rc
+                            rc=rc,
                         )
                         print(f"💾 Stored old format token in database")
-                        
-                        # Notify paper trading strategies
+
                         if not is_blacklisted(mint):
-                            dispatch_new_token({
-                                "address": mint, "name": name, "symbol": symbol,
-                                "dex": dex, "risk": risk, "signature": sig
-                            })
-                except Exception as e:
-                    print(f"❌ Database error for old format: {e}")
-            elif msg.get("result") and msg.get("result", {}).get("message"):
-                # Handle subscription confirmation messages
-                print(f"[INFO] {msg['result']['message']} (ID: {msg['result'].get('subscription_id', 'unknown')})")
+                            dispatch_new_token(
+                                {
+                                    "address": mint,
+                                    "name": name,
+                                    "symbol": symbol,
+                                    "dex": dex,
+                                    "risk": risk,
+                                    "signature": sig,
+                                }
+                            )
+                    except Exception as e:
+                        print(f"❌ Database error for old format: {e}")
+                elif msg.get("result") and msg.get("result", {}).get("message"):
+                    print(
+                        f"[INFO] {msg['result']['message']} (ID: {msg['result'].get('subscription_id', 'unknown')})"
+                    )
+            except Exception as e:
+                print(f"[ws] error handling message: {e} -> {msg!r}")
+                continue
+                
 
     finally:
         heartbeat_task.cancel()

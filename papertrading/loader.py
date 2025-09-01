@@ -10,9 +10,13 @@ def load_strategies():
     raw = os.getenv("PAPER_STRATEGIES", "").strip()
     if not raw: return []
     for path in [p.strip() for p in raw.split(",") if p.strip()]:
-        mod_path, cls_name = path.rsplit(".", 1)
-        mod = importlib.import_module(mod_path)
-        cls: Type[Strategy] = getattr(mod, cls_name)
+        try:
+            mod_path, cls_name = path.rsplit(".", 1)
+            mod = importlib.import_module(mod_path)
+            cls: Type[Strategy] = getattr(mod, cls_name)
+        except Exception as e:
+            print(f"[paper] failed to load strategy '{path}': {e}")
+            continue
         _STRATS.append(cls())
     for s in _STRATS:
         try: s.on_start(_CTX)

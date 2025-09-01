@@ -1,8 +1,8 @@
 import os, sqlite3, json
 
-# persistent file-based database (instead of in-memory)
-DB_PATH = "memecoin_sniper.db"
-DB = sqlite3.connect(DB_PATH, check_same_thread=False)
+# Use a shared in-memory database; no data is persisted to disk
+DB_PATH = "file:memdb1?mode=memory&cache=shared"
+DB = sqlite3.connect(DB_PATH, uri=True, check_same_thread=False)
 
 # fast pragmas for performance
 DB.execute("PRAGMA journal_mode=WAL")
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS prices (
 DB.commit()
 
 def upsert_safe_token(*, address: str, name: str, symbol: str, dex: str,
-                      risk: int, signature: str, rc: dict):
+                      risk: int, signature: str, rc: dict | None = None):
     """Insert or update a safe token in the database."""
     DB.execute("""
       INSERT INTO tokens(address, chain, name, symbol, dex, risk, signature, rc_json, approved)
@@ -98,18 +98,24 @@ def get_token_by_address(address: str) -> dict:
 
 def get_recent_tokens(hours: int = 24, limit: int = 50) -> list:
     """Get tokens seen in the last N hours."""
-    cursor = DB.execute("""
+    cursor = DB.execute(
+        """
         SELECT address, name, symbol, dex, risk, signature, created_at, last_seen
-        FROM tokens 
-        WHERE last_seen >= datetime('now', '-{} hours')
-        ORDER BY last_seen DESC 
+        FROM tokens
+        WHERE last_seen >= datetime('now', ?)
+        ORDER BY last_seen DESC
         LIMIT ?
-    """.format(hours), (limit,))
+        """,
+        (f'-{int(hours)} hours', int(limit)),
+    )
     return cursor.fetchall()
 
 def clear_old_tokens(days: int = 7):
     """Remove tokens older than N days."""
-    DB.execute("DELETE FROM tokens WHERE last_seen < datetime('now', '-{} days')".format(days))
+    DB.execute(
+        "DELETE FROM tokens WHERE last_seen < datetime('now', ?)",
+        (f'-{int(days)} days',),
+    )
     DB.commit()
 
 def get_stats() -> dict:
