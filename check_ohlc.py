@@ -6,7 +6,7 @@ Simple script to check OHLC data in database
 import sys
 sys.path.append('.')
 
-from db import get_ohlc_1m
+from db import get_ohlc_1m, DB
 
 def check_ohlc():
     """Check what OHLC data exists."""
@@ -26,14 +26,10 @@ def check_ohlc():
     
     # Check for any other tokens
     print("\n🔍 Checking for any OHLC data...")
-    import sqlite3
-    conn = sqlite3.connect(":memory:")
-    conn.execute("ATTACH 'file:memdb1?mode=memory&cache=shared' AS memdb")
-    
     try:
-        cursor = conn.execute("SELECT address, COUNT(*) FROM memdb.ohlc_1m GROUP BY address")
+        cursor = DB.execute("SELECT address, COUNT(*) FROM ohlc_1m GROUP BY address")
         results = cursor.fetchall()
-        
+
         if results:
             print("📊 OHLC data found:")
             for addr, count in results:
@@ -42,8 +38,6 @@ def check_ohlc():
             print("📭 No OHLC data found in database")
     except Exception as e:
         print(f"❌ Error querying database: {e}")
-    
-    conn.close()
 
 if __name__ == "__main__":
     check_ohlc()

@@ -1,6 +1,7 @@
 import os, math, asyncio, itertools
 import time
 import httpx
+import logging
 from db import upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
 from dexscreener_client import fetch_token_batch
 from ohlc_agg import add_sample
@@ -67,8 +68,8 @@ async def _poll_once(client: httpx.AsyncClient, addr_batches):
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 429:
                 await asyncio.sleep(1.5)  # brief backoff
-        except Exception:
-            pass
+        except Exception as e:
+            logging.exception("Unexpected error during price poll: %s", e)
 
     await asyncio.gather(*(one(b) for b in addr_batches))
 
