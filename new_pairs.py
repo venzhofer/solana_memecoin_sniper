@@ -332,9 +332,12 @@ async def main():
         while True:
             try:
                 await listen()
+            except websockets.ConnectionClosed as e:
+                print(f"[ws] closed: close_code={e.code} close_reason={e.reason}")
             except Exception as e:
-                print(f"[ws] error: {e}, reconnecting in 5s...")
-                await asyncio.sleep(5)
+                print(f"[ws] error: {e}")
+            print("[ws] reconnecting in 5s...")
+            await asyncio.sleep(5)
     finally:
         for t in (maintenance_task, prices_task):
             t.cancel()
