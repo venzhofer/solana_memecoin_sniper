@@ -1,7 +1,7 @@
 # View recent 1-minute candles for a token.
 import sys, time
 sys.path.append('.')
-from db import get_ohlc_1m
+from trading_bot.db import get_ohlc_1m
 
 if len(sys.argv) < 2:
     print("Usage: python scripts/peek_ohlc.py <TOKEN_MINT> [LIMIT]")

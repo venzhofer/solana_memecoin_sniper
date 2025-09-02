@@ -1,6 +1,6 @@
 # Paper-only tables & helpers, built on top of the main in-RAM SQLite connection.
 from typing import Any, Optional
-from db import DB, get_ohlc_1m  # reuse core DB + candles
+from ..db import DB, get_ohlc_1m  # reuse core DB + candles
 
 # --- Paper schema ---
 DB.execute("""

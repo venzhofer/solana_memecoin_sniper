@@ -1,13 +1,13 @@
 import asyncio, json, os, sys, signal
 from dotenv import load_dotenv
 import websockets
-from rugcheck_client import get_risk_level
-from db import (
+from .rugcheck_client import get_risk_level
+from .db import (
     upsert_safe_token, count_tokens, get_stats,
     get_recent_tokens, get_tokens_by_risk, clear_old_tokens
 )
-from price_watcher import watch_prices
-from papertrading import load_strategies, dispatch_new_token, is_blacklisted
+from .price_watcher import watch_prices
+from .papertrading import load_strategies, dispatch_new_token, is_blacklisted
 
 load_dotenv()
 API_KEY = os.getenv("SOLANASTREAM_API_KEY")
@@ -347,7 +347,7 @@ async def main():
                 pass
         
         # Shutdown paper trading strategies
-        from papertrading import shutdown
+        from .papertrading import shutdown
         shutdown()
 
 if __name__ == "__main__":
@@ -373,7 +373,7 @@ if __name__ == "__main__":
             print(f"❌ Error getting final stats: {e}")
         
         # Shutdown paper trading strategies
-        from papertrading import shutdown
+        from .papertrading import shutdown
         shutdown()
         
         print("=" * 60)

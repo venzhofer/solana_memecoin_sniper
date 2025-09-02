@@ -2,8 +2,8 @@ import sys
 import os
 # Add the parent directory to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from indicators import EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
-from db import get_ohlc_1m
+from trading_bot.indicators import EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
+from trading_bot.db import get_ohlc_1m
 
 if len(sys.argv) < 2:
     print("Usage: python scripts/peek_indicators.py <MINT> [N_BARS]"); raise SystemExit(1)

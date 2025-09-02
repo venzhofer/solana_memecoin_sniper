@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, reset_indicators
-from db import (
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.indicators import update_all_for_bar, reset_indicators
+from trading_bot.db import (
     upsert_safe_token, insert_ohlc_1m, insert_ema_1m, insert_atr_1m,
     count_tokens, get_stats
 )
@@ -127,7 +127,7 @@ def test_aggressive_trading():
     
     # Check if trade was executed
     print("\n4️⃣ Checking for executed trades...")
-    from papertrading.db import pos_get
+    from trading_bot.papertrading.db import pos_get
     
     pos = pos_get(token["address"])
     if pos:

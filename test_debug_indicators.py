@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, reset_indicators
-from db import (
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.indicators import update_all_for_bar, reset_indicators
+from trading_bot.db import (
     upsert_safe_token, insert_ohlc_1m, insert_ema_1m, insert_atr_1m,
     count_tokens, get_stats
 )
@@ -78,7 +78,7 @@ def test_debug_indicators():
     
     # Check what's in database
     print("\n5️⃣ Checking database...")
-    from db import get_ema_1m, get_atr_1m
+    from trading_bot.db import get_ema_1m, get_atr_1m
     
     db_emas = get_ema_1m(token["address"], 10)
     print(f"   📊 EMAs in DB: {len(db_emas)}")

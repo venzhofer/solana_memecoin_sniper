@@ -2,11 +2,11 @@ import os, math, asyncio, itertools
 import time
 import httpx
 import logging
-from db import upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
-from dexscreener_client import fetch_token_batch
-from ohlc_agg import add_sample
-from indicators import update_all_for_bar
-from papertrading import get_watchable_addresses, dispatch_bar_1m
+from .db import upsert_price, insert_ohlc_1m, insert_ema_1m, insert_atr_1m
+from .dexscreener_client import fetch_token_batch
+from .ohlc_agg import add_sample
+from .indicators import update_all_for_bar
+from .papertrading import get_watchable_addresses, dispatch_bar_1m
 
 INTERVAL = float(os.getenv("PRICE_POLL_INTERVAL_SEC", "2"))
 BATCH_SIZE = int(os.getenv("DEXSCREENER_BATCH_SIZE", "30"))

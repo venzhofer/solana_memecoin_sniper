@@ -1,6 +1,6 @@
 # Paper-only tables & helpers, built on top of the main in-RAM SQLite connection.
 from typing import Any, Optional
-from db import DB, get_ohlc_1m  # reuse core DB + candles
+from ..db import DB, get_ohlc_1m  # reuse core DB + candles
 
 # --- Paper schema ---
 DB.execute("""
@@ -84,7 +84,7 @@ def pos_upsert(address: str, **kw: Any):
     vals = [kw.get(c) for c in cols]
     DB.execute(f"""
       INSERT INTO paper_positions(address,{','.join(cols)},updated_at)
-      VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+      VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
       ON CONFLICT(address) DO UPDATE SET
         {', '.join([f"{c}=excluded.{c}" for c in cols])},
         updated_at=CURRENT_TIMESTAMP

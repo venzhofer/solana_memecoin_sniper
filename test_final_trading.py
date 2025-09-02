@@ -9,9 +9,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, reset_indicators
-from db import (
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.indicators import update_all_for_bar, reset_indicators
+from trading_bot.db import (
     upsert_safe_token, insert_ohlc_1m, insert_ema_1m, insert_atr_1m,
     count_tokens, get_stats
 )
@@ -127,7 +127,7 @@ def test_final_trading():
     print(f"      O:1.0050 H:1.1500 L:1.0050 C:1.1500 | EMA(5): {ema_rows[0]['value']:.6f} | ATR(14): {atr_rows[0]['value']:.6f}")
     
     # Check strategy conditions
-    from db import get_ohlc_1m
+    from trading_bot.db import get_ohlc_1m
     bars = get_ohlc_1m(token["address"], 5)
     if bars and len(bars) >= 3:
         prev_bars = bars[1:4]  # Bars 1, 2, 3 (excluding current)
@@ -142,7 +142,7 @@ def test_final_trading():
     
     # Check for trade execution
     print("\n4️⃣ Checking for executed trades...")
-    from papertrading.db import pos_get
+    from trading_bot.papertrading.db import pos_get
     
     pos = pos_get(token["address"])
     if pos:

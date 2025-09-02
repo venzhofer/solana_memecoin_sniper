@@ -6,7 +6,7 @@ Simple script to check OHLC data in database
 import sys
 sys.path.append('.')
 
-from db import get_ohlc_1m, DB
+from trading_bot.db import get_ohlc_1m, DB
 
 def check_ohlc():
     """Check what OHLC data exists."""

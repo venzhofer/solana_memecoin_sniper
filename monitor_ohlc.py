@@ -8,8 +8,8 @@ import sys
 import os
 sys.path.append('.')
 
-from ohlc_agg import _buffers
-from db import get_ohlc_1m, list_all_addresses
+from trading_bot.ohlc_agg import _buffers
+from trading_bot.db import get_ohlc_1m, list_all_addresses
 
 def show_buffer_status():
     if not _buffers:
