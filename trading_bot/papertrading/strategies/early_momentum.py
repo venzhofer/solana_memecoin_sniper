@@ -1,11 +1,11 @@
 import os
 from typing import Dict, Any, List
-from papertrading.base import Strategy, StrategyContext
-from papertrading.db import (
+from ..base import Strategy, StrategyContext
+from ..db import (
     pos_get, pos_upsert, purge_token_data, blacklist_add, is_blacklisted,
     pos_set_entry_marketcap, get_token_meta, get_entry_marketcap
 )
-from db import get_ohlc_1m  # reuse candles
+from ...db import get_ohlc_1m  # reuse candles
 
 def _find_ema(rows: List[Dict[str, Any]], length: int, source: str = "low"):
     return next((r["value"] for r in rows if r.get("length")==length and r.get("source")==source), None)

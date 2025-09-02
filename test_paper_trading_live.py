@@ -10,9 +10,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, reset_indicators
-from db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, upsert_safe_token
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.indicators import update_all_for_bar, reset_indicators
+from trading_bot.db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, upsert_safe_token
 
 def simulate_live_trading():
     """Simulate live paper trading with fake data."""

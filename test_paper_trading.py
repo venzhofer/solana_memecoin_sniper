@@ -12,9 +12,9 @@ load_dotenv()
 
 sys.path.append('.')
 
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
-from db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, upsert_safe_token
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
+from trading_bot.db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, upsert_safe_token
 
 def test_paper_trading():
     """Test the complete paper trading system."""

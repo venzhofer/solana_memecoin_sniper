@@ -7,8 +7,8 @@ import time
 import sys
 sys.path.append('.')
 
-from ohlc_agg import add_sample
-from db import insert_ohlc_1m, get_ohlc_1m
+from trading_bot.ohlc_agg import add_sample
+from trading_bot.db import insert_ohlc_1m, get_ohlc_1m
 
 def test_ohlc_aggregation():
     """Test the OHLC aggregation system with sample data."""

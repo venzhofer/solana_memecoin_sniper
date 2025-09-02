@@ -1,16 +1,15 @@
 # Paper-only tables & helpers, built on top of the main in-RAM SQLite connection.
 from typing import Any, Optional
-from db import DB, get_ohlc_1m # reuse core DB + candles
+from ..db import DB, get_ohlc_1m  # reuse core DB + candles
 
 # --- Paper schema ---
 DB.execute("""
 CREATE TABLE IF NOT EXISTS paper_blacklist (
-  address    TEXT PRIMARY KEY,
-  reason     TEXT,
+  address TEXT PRIMARY KEY,
+  reason  TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """)
-
 DB.execute("""
 CREATE TABLE IF NOT EXISTS paper_positions (
   address              TEXT PRIMARY KEY,
@@ -25,7 +24,6 @@ CREATE TABLE IF NOT EXISTS paper_positions (
   updated_at           DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 """)
-
 DB.execute("""
 CREATE TABLE IF NOT EXISTS paper_trades (
   id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +35,6 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   note      TEXT
 );
 """)
-
 DB.execute("CREATE INDEX IF NOT EXISTS idx_paper_positions_status ON paper_positions(status)")
 DB.execute("CREATE INDEX IF NOT EXISTS idx_paper_trades_addr ON paper_trades(address)")
 DB.commit()
@@ -94,15 +91,15 @@ def pos_upsert(address: str, **kw: Any):
     """, (address, *vals))
     DB.commit()
 
-def pos_set_entry_marketcap(address: str, mc_usd: Optional[float]):
-    DB.execute("UPDATE paper_positions SET entry_marketcap_usd=? WHERE address=?", (mc_usd, address))
-    DB.commit()
-
 def trade_log(address: str, side: str, qty: Optional[float], price: float, ts_start: int, note: str = ""):
     DB.execute("""
       INSERT INTO paper_trades(address, side, qty, price, ts_start, note)
       VALUES(?,?,?,?,?,?)
     """, (address, side, qty, price, ts_start, note))
+    DB.commit()
+
+def pos_set_entry_marketcap(address: str, mc_usd: Optional[float]):
+    DB.execute("UPDATE paper_positions SET entry_marketcap_usd=? WHERE address=?", (mc_usd, address))
     DB.commit()
 
 def get_token_meta(address: str) -> tuple[Optional[str], Optional[str]]:

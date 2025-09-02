@@ -1,13 +1,13 @@
 import asyncio, json, os, sys, signal
 from dotenv import load_dotenv
 import websockets
-from rugcheck_client import get_risk_level
-from db import (
+from .rugcheck_client import get_risk_level
+from .db import (
     upsert_safe_token, count_tokens, get_stats,
     get_recent_tokens, get_tokens_by_risk, clear_old_tokens
 )
-from price_watcher import watch_prices
-from papertrading import load_strategies, dispatch_new_token, is_blacklisted
+from .price_watcher import watch_prices
+from .papertrading import load_strategies, dispatch_new_token, is_blacklisted
 
 load_dotenv()
 API_KEY = os.getenv("SOLANASTREAM_API_KEY")
@@ -31,7 +31,7 @@ MSG = {
     "jsonrpc": "2.0",
     "id": 1,
     "method": "newPairSubscribe",
-    "params": {"include_pumpfun": True}
+    "params": {"include_pumpfun": True, "api_key": API_KEY}
 }
 
 async def send_heartbeat(ws):
@@ -105,36 +105,27 @@ def show_recent_tokens():
 
 async def handle_connection(ws):
     """Handle the websocket connection and message processing."""
+    print("[ws] connected")
+    await ws.send(json.dumps(MSG))
+    print("[ws] subscribed to new pairs")
+
+    heartbeat_task = asyncio.create_task(send_heartbeat(ws))
+
     try:
         message_count = 0
-        print("[ws] waiting for messages...")
         async for raw in ws:
             message_count += 1
-            print(f"[ws] received message #{message_count}: {raw[:100]}...")
 
             try:
                 msg = json.loads(raw)
-                
-                # Check for connection error responses
-                if msg.get("error"):
-                    error = msg["error"]
-                    if error.get("code") == -32001:  # Too many connections
-                        print(f"[ws] Server error: {error.get('message', 'Too many connections')}")
-                        print(f"[ws] ⚠️  SolanaStream API shows active connections")
-                        print(f"[ws] 🕐 Waiting 5 minutes for server to clear old connections...")
-                        print(f"[ws] 💡 Note: This is a server-side issue with connection cleanup")
-                        await asyncio.sleep(300)  # 5 minutes
-                        raise Exception("Too many connections - retrying after extended wait")
-                    else:
-                        print(f"[ws] Server error: {error}")
-                        continue
 
+                if msg.get("method") == "ping":
+                    await ws.send(json.dumps({"jsonrpc": "2.0", "id": msg.get("id"), "result": "pong"}))
+                    continue
             except json.JSONDecodeError as e:
                 print(f"[ws] JSON decode error: {e} -> {raw[:200]!r}")
                 continue
             except Exception as e:
-                if "Server rejected connection" in str(e):
-                    raise  # Re-raise server connection errors
                 print(f"[ws] error parsing message: {e} -> {raw[:200]!r}")
                 continue
 
@@ -262,56 +253,43 @@ async def handle_connection(ws):
                 
 
     finally:
-        pass
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
 
 async def listen():
-    # Enable ping/pong to keep connection alive
+    # Allow the client to participate in server heartbeats
     connect_kwargs = {
-        "ping_interval": 30,
-        "ping_timeout": 10,
-        "close_timeout": 10,
-        "max_size": None,
+        "ping_interval": 20,  # default ping interval
+        "ping_timeout": 20,   # default ping timeout
+        "close_timeout": 10,  # Wait 10 seconds for close
+        "max_size": None      # No message size limit
     }
 
     print(f"[debug] Connecting to {URL} with API key: {API_KEY[:10]}...")
-
-    # Try different header styles depending on websockets version
+    
+    # Try different header parameter names for different websockets versions
     try:
-        async with websockets.connect(URL, headers={"X-API-KEY": API_KEY}, **connect_kwargs) as websocket:
-            print("[ws] connected")
-            await websocket.send(json.dumps(MSG))
-            print("[ws] subscribed to new pairs")
-            await handle_connection(websocket)
-            return
+        # Try extra_headers first
+        async with websockets.connect(URL, extra_headers={"X-API-KEY": API_KEY}, **connect_kwargs) as ws:
+            await handle_connection(ws)
     except TypeError:
-        pass
-
-    try:
-        async with websockets.connect(URL, extra_headers={"X-API-KEY": API_KEY}, **connect_kwargs) as websocket:
-            print("[ws] connected")
-            await websocket.send(json.dumps(MSG))
-            print("[ws] subscribed to new pairs")
-            await handle_connection(websocket)
-            return
-    except TypeError:
-        pass
-
-    try:
-        async with websockets.connect(URL, additional_headers={"X-API-KEY": API_KEY}, **connect_kwargs) as websocket:
-            print("[ws] connected")
-            await websocket.send(json.dumps(MSG))
-            print("[ws] subscribed to new pairs")
-            await handle_connection(websocket)
-            return
-    except TypeError:
-        pass
-
-    # Last resort: connect without headers
-    async with websockets.connect(URL, **connect_kwargs) as websocket:
-        print("[ws] connected")
-        await websocket.send(json.dumps(MSG))
-        print("[ws] subscribed to new pairs")
-        await handle_connection(websocket)
+        try:
+            # Try additional_headers
+            async with websockets.connect(URL, additional_headers={"X-API-KEY": API_KEY}, **connect_kwargs) as ws:
+                await handle_connection(ws)
+        except TypeError:
+            try:
+                # Try headers
+                async with websockets.connect(URL, headers={"X-API-KEY": API_KEY}, **connect_kwargs) as ws:
+                    await handle_connection(ws)
+            except TypeError:
+                # Last resort: try without headers and send API key in the subscription message
+                print("[ws] Trying connection without custom headers...")
+                async with websockets.connect(URL, **connect_kwargs) as ws:
+                    await handle_connection(ws)
 
 async def main():
     # Show comprehensive startup information
@@ -354,12 +332,12 @@ async def main():
         while True:
             try:
                 await listen()
+            except websockets.ConnectionClosed as e:
+                print(f"[ws] closed: close_code={e.code} close_reason={e.reason}")
             except Exception as e:
-                print(f"[ws] error: {e}, reconnecting in 5s...")
-                # Force garbage collection to clean up old connections
-                import gc
-                gc.collect()
-                await asyncio.sleep(5)
+                print(f"[ws] error: {e}")
+            print("[ws] reconnecting in 5s...")
+            await asyncio.sleep(5)
     finally:
         for t in (maintenance_task, prices_task):
             t.cancel()
@@ -369,7 +347,7 @@ async def main():
                 pass
         
         # Shutdown paper trading strategies
-        from papertrading import shutdown
+        from .papertrading import shutdown
         shutdown()
 
 if __name__ == "__main__":
@@ -395,7 +373,7 @@ if __name__ == "__main__":
             print(f"❌ Error getting final stats: {e}")
         
         # Shutdown paper trading strategies
-        from papertrading import shutdown
+        from .papertrading import shutdown
         shutdown()
         
         print("=" * 60)

@@ -72,13 +72,20 @@ kill -USR1 <PID>
 
 ```
 solana_memecoin_sniper/
-├── new_pairs.py          # Main monitoring script
-├── db.py                 # Database operations
-├── rugcheck_client.py    # Risk assessment client
+├── trading_bot/          # Core trading bot package
+│   ├── new_pairs.py          # Main monitoring script
+│   ├── price_watcher.py      # Price polling & indicator updates
+│   ├── ohlc_agg.py           # In-memory OHLC aggregator
+│   ├── dexscreener_client.py # Price API client
+│   ├── rugcheck_client.py    # Risk assessment client
+│   ├── db.py                 # Database operations
+│   ├── indicators/           # Technical indicators
+│   └── papertrading/         # Strategy & paper trading engine
 ├── query_db.py           # Database query tool
+├── scripts/              # Utility scripts
 ├── requirements.txt      # Python dependencies
 ├── .env                  # Environment variables
-└── README.md            # This file
+└── README.md             # This file
 ```
 
 ## ⚙️ Configuration
