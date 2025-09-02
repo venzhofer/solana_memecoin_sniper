@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os, sqlite3, json
 
 # Use a shared in-memory database; no data is persisted to disk
