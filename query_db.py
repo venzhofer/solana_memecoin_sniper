@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from db import get_stats, get_recent_tokens, get_tokens_by_risk, get_token_by_address
+from trading_bot.db import get_stats, get_recent_tokens, get_tokens_by_risk, get_token_by_address
 
 def main():
     print("🔍 SOLANA MEMECOIN SNIPER - DATABASE QUERY TOOL")

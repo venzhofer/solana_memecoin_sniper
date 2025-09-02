@@ -8,8 +8,8 @@ import time
 import sys
 sys.path.append('.')
 
-from ohlc_agg import add_sample, _buffers
-from db import insert_ohlc_1m, get_ohlc_1m, list_all_addresses
+from trading_bot.ohlc_agg import add_sample, _buffers
+from trading_bot.db import insert_ohlc_1m, get_ohlc_1m, list_all_addresses
 
 def show_buffer_status():
     """Show current status of all OHLC buffers."""

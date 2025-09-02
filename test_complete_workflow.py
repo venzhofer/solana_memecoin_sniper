@@ -17,15 +17,16 @@ import time
 import asyncio
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import pytest
 
 # Load environment variables
 load_dotenv()
 
 # Import our modules
-from db import upsert_safe_token, count_tokens, get_tokens_by_risk
-from indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
-from papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
-from papertrading.db import get_watchable_addresses, pos_get, trade_log
+from trading_bot.db import upsert_safe_token, count_tokens, get_tokens_by_risk
+from trading_bot.indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
+from trading_bot.papertrading import load_strategies, dispatch_new_token, dispatch_bar_1m, shutdown
+from trading_bot.papertrading.db import get_watchable_addresses, pos_get, trade_log
 
 def simulate_new_memecoin():
     """Simulate a new memecoin appearing"""
@@ -105,8 +106,21 @@ def simulate_price_data(address, base_price=0.001):
         
         prices.append(bar)
         print(f"   Bar {i+1}: O:{open_price:.6f} H:{high:.6f} L:{low:.6f} C:{close_price:.6f}")
-    
+
     return prices
+
+
+@pytest.fixture
+def address():
+    """Provide a simulated memecoin address"""
+    memecoin = simulate_new_memecoin()
+    return memecoin["address"]
+
+
+@pytest.fixture
+def prices(address):
+    """Generate sample price bars for the given address"""
+    return simulate_price_data(address)
 
 def test_ohlc_and_indicators(address, prices):
     """Test OHLC creation and technical indicators"""
@@ -197,7 +211,7 @@ def test_database_persistence():
     print(f"👀 Watchable addresses: {len(watchable)}")
     
     # Check positions
-    from papertrading.db import DB
+    from trading_bot.papertrading.db import DB
     positions = DB.execute("SELECT COUNT(*) FROM paper_positions").fetchone()[0]
     print(f"📈 Paper positions: {positions}")
     

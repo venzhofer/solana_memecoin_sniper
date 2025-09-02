@@ -6,8 +6,8 @@ Complete test script that tests OHLC, indicators, and database in one run
 import sys
 sys.path.append('.')
 
-from indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
-from db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, get_ohlc_1m, get_ema_1m, get_atr_1m
+from trading_bot.indicators import update_all_for_bar, EMA_LENGTHS, EMA_SOURCE, ATR_LENGTHS
+from trading_bot.db import insert_ohlc_1m, insert_ema_1m, insert_atr_1m, get_ohlc_1m, get_ema_1m, get_atr_1m
 
 def test_complete():
     """Test the complete system in one run."""
